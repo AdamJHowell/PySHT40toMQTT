@@ -1,0 +1,8 @@
+{
+	"notes":          "Raspberry Pi Zero 2 W with SHT40",
+	"brokerAddress":  "10.250.250.84",
+	"brokerPort":     "1883",
+	"brokerQoS":      1,
+	"publishTopic":   "PiZeroSHT40",
+	"sleepTime":      10
+}
