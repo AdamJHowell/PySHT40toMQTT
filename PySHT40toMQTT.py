@@ -13,39 +13,36 @@ import adafruit_sht4x
 import datetime
 import paho.mqtt.client as mqtt
 from uuid import getnode as get_mac
-from pathlib import Path
 
 client = mqtt.Client( client_id = "PySHT40toMQTT" )
 
 
-# The callback for when a connection is made to the server.
 def on_connect( client2, userdata, flags, result ):
     if result != 0:
-        print( "Bad connection, returned code=", result )
+        print( "Bad connection, returned code: ", result )
 
 
-# The callback for when a connection is made to the server.
 def on_disconnect():
     print( "Disconnected from broker!" )
 
 
-def on_publish( client3, userdata, result ):  # create function for callback
+def on_publish( client3, userdata, result ):
     # print( "Published message: \"" + str( result ) + "\"" )
     pass
 
 
 def get_ip():
-    s = socket.socket( socket.AF_INET, socket.SOCK_DGRAM )
-    s.settimeout( 0 )
+    sock = socket.socket( socket.AF_INET, socket.SOCK_DGRAM )
+    sock.settimeout( 0 )
     try:
         # This address doesn't need to be reachable.
-        s.connect( ( '10.255.255.255', 1 ) )
-        IP = s.getsockname()[0]
-    except Exception:
-        IP = '127.0.0.1'
+        sock.connect( ('10.255.255.255', 1) )
+        ip = sock.getsockname()[0]
+    except InterruptedError:
+        ip = '127.0.0.1'
     finally:
-        s.close()
-    return IP
+        sock.close()
+    return ip
 
 
 def main( argv ):
@@ -85,7 +82,7 @@ def main( argv ):
         results['brokerAddress'] = configuration['brokerAddress']
         results['brokerPort'] = configuration['brokerPort']
         results['clientAddress'] = get_ip()
-        results['clientMAC'] = ':'.join( ( "%012X" % get_mac() )[i:i+2] for i in range( 0, 12, 2 ) )
+        results['clientMAC'] = ':'.join( ("%012X" % get_mac())[i:i + 2] for i in range( 0, 12, 2 ) )
 
         # Define callback functions.
         client.on_connect = on_connect
@@ -94,7 +91,7 @@ def main( argv ):
 
         # Connect using the details from the configuration file.
         client.connect( configuration['brokerAddress'], int( configuration['brokerPort'] ) )
-        
+
         while True:
             client.loop_start()
             timestamp = datetime.datetime.now().strftime( "%Y-%m-%d %H:%M:%S" )
@@ -103,7 +100,7 @@ def main( argv ):
             results['tempC'] = temperature
             results['humidity'] = relative_humidity
             print( json.dumps( results, indent = '\t' ) )
-            info = client.publish( topic = configuration['publishTopic'], payload = json.dumps( results, indent = '\t' ), qos = configuration['brokerQoS'] )
+            client.publish( topic = configuration['publishTopic'], payload = json.dumps( results, indent = '\t' ), qos = configuration['brokerQoS'] )
             client.loop_stop()
             time.sleep( configuration['sleepTime'] )
 
