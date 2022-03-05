@@ -7,18 +7,18 @@ This Python program will:
 3. Use the settings to connect to a MQTT broker.
 4. Publish sensor and client information to the broker on a timer set in the config file.
 
-Prerequisites:
-
-* pip install adafruit-circuitpython-sht4x
-* pip install paho-mqtt
-
 This was designed for Raspberry Pi devices, and has been tested on a Pi Zero 2 W.
 
-It can be set to auto-start by editing this file:
+### Installation:
+
+> pip install adafruit-circuitpython-sht4x
+> pip install paho-mqtt
+
+#### It can be set to auto-start by editing this file:
 
 > sudo nano /etc/xdg/autostart/display.desktop
 
-And setting the contents to this:
+#### And setting the contents to this:
 
 > [Desktop Entry]
 > 
