@@ -1,7 +1,7 @@
-# This tool will connect to a MQTT broker, and publish simple MQTT messages as fast as possible.
+# This tool will connect to a MQTT broker, and publish simple MQTT messages containing weather data.
 # The sole command-line-parameter is the configuration file.
 # The configuration file is in JSON format.
-# It must contain "brokerAddress", "brokerPort", "publishTopic", and "maxTimeSeconds".
+# It must contain "brokerAddress", "brokerPort", "brokerQoS", "publishTopic", and "sleepTime".
 # https://pypi.org/project/paho-mqtt/
 
 import sys
@@ -13,6 +13,7 @@ import adafruit_sht4x
 import datetime
 import paho.mqtt.client as mqtt
 from uuid import getnode as get_mac
+from pathlib import Path
 
 client = mqtt.Client( client_id = "PySHT40toMQTT" )
 
@@ -48,11 +49,12 @@ def get_ip():
 
 
 def main( argv ):
-    config_file_name = "config.json"
+    config_file_name = "/home/pi/Source/PySHT40toMQTT/config.json"
 
     try:
-        if len( argv ) > 0:
-            config_file_name = argv[0]
+        if len( argv ) > 1:
+            config_file_name = argv[1]
+        print( "Using " + config_file_name + " as the config file." )
         # Read in the configuration file.
         with open( config_file_name, "r" ) as config_file:
             configuration = json.load( config_file )
@@ -92,7 +94,7 @@ def main( argv ):
 
         # Connect using the details from the configuration file.
         client.connect( configuration['brokerAddress'], int( configuration['brokerPort'] ) )
-
+        
         while True:
             client.loop_start()
             timestamp = datetime.datetime.now().strftime( "%Y-%m-%d %H:%M:%S" )
@@ -101,7 +103,7 @@ def main( argv ):
             results['tempC'] = temperature
             results['humidity'] = relative_humidity
             print( json.dumps( results, indent = '\t' ) )
-            info = client.publish( topic = configuration['publishTopic'], payload = str( results ), qos = configuration['brokerQoS'] )
+            info = client.publish( topic = configuration['publishTopic'], payload = json.dumps( results, indent = '\t' ), qos = configuration['brokerQoS'] )
             client.loop_stop()
             time.sleep( configuration['sleepTime'] )
 
@@ -115,4 +117,4 @@ def main( argv ):
 
 
 if __name__ == "__main__":
-    main( sys.argv[1:] )
+    main( sys.argv )
