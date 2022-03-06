@@ -12,6 +12,7 @@ This was designed for Raspberry Pi devices, and has been tested on a Pi Zero 2 W
 ### Installation:
 
 > pip install adafruit-circuitpython-sht4x
+> >
 > pip install paho-mqtt
 
 #### It can be set to auto-start by editing this file:
