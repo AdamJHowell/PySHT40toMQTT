@@ -6,5 +6,5 @@
 	"publishTopic":     "piWeather",
 	"controlTopic":     "piControl",
 	"seaLevelPressure": 1015.1,
-	"publishInterval":  60
+	"publishInterval":     60
 }

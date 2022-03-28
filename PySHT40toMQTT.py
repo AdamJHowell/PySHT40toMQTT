@@ -19,6 +19,8 @@ i2c = board.I2C()  # uses board.SCL and board.SDA
 sht = adafruit_sht4x.SHT4x( i2c )
 results = json.loads( '{}' )
 configuration = json.loads( '{}' )
+config_file_name = "/home/pi/Source/PySHT40toMQTT/config.json"
+last_publish = 0
 
 
 def on_connect( con_client, userdata, flags, result ):
@@ -36,6 +38,7 @@ def on_disconnect():
 
 def on_message( sub_client, userdata, msg ):
   global configuration
+  global last_publish
   message = json.loads( str( msg.payload.decode( 'utf-8' ) ) )
   print( json.dumps( message, indent = '\t' ) )
   if 'command' in message:
@@ -44,17 +47,24 @@ def on_message( sub_client, userdata, msg ):
       case "publishTelemetry":
         temperature, relative_humidity = read_sht()
         publish_results( temperature, relative_humidity )
+        last_publish = epoch_time()
       case "changeTelemetryInterval":
-        print( "Old publish interval: " + configuration['publishInterval'] )
-        configuration['publishInterval'] = message['value']
-        print( "New publish interval: " + configuration['publishInterval'] )
+        old_value = configuration['publishInterval']
+        new_value = message['value']
+        if old_value != new_value:
+          print( "Old publish interval: " + old_value )
+          configuration['publishInterval'] = new_value
+          print( "New publish interval: " + configuration['publishInterval'] )
       case "changeSeaLevelPressure":
-        print( "Old sea level pressure: " + configuration['seaLevelPressure'] )
-        configuration['seaLevelPressure'] = message['value']
-        print( "New sea level pressure: " + configuration['seaLevelPressure'] )
+        old_value = configuration['seaLevelPressure']
+        new_value = message['value']
+        if old_value != new_value:
+          print( "Old sea level pressure: " + old_value )
+          configuration['seaLevelPressure'] = new_value
+          print( "New sea level pressure: " + configuration['seaLevelPressure'] )
       case "publishStatus":
         publish_status()
-      case "":
+      case "debug":
         print( str( sub_client ) )
         print( str( userdata ) )
       case _:
@@ -87,6 +97,10 @@ def read_sht():
   return sht.measurements
 
 
+def epoch_time():
+  return round( time.time() * 1000000 )
+
+
 def get_timestamp():
   return datetime.datetime.now().strftime( "%Y-%m-%d %H:%M:%S" )
 
@@ -108,7 +122,8 @@ def publish_status():
 
 def main( argv ):
   global configuration
-  config_file_name = "/home/pi/Source/PySHT40toMQTT/config.json"
+  global config_file_name
+  global last_publish
 
   try:
     if len( argv ) > 1:
@@ -156,12 +171,14 @@ def main( argv ):
     client.subscribe( configuration['controlTopic'], configuration['brokerQoS'] )
 
     while True:
-      # ToDo: Determine if client.loop_start() and loop_stop() should be in this while loop.
-      client.loop_start()
-      temperature, relative_humidity = read_sht()
-      publish_results( temperature, relative_humidity )
-      client.loop_stop()
-      time.sleep( configuration['sleepTimeSec'] )
+      if epoch_time() - configuration['publishInterval'] > last_publish:
+        print( "Publishing" )
+        # ToDo: Determine if client.loop_start() and loop_stop() should be in this while loop.
+        client.loop_start()
+        temperature, relative_humidity = read_sht()
+        publish_results( temperature, relative_humidity )
+        last_publish = epoch_time()
+        client.loop_stop()
 
   except KeyboardInterrupt:
     print( "\nKeyboard interrupt detected, exiting...\n" )
