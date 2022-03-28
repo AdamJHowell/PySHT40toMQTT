@@ -1,8 +1,10 @@
 {
-	"notes":          "Raspberry Pi Zero 2 W with SHT40",
-	"brokerAddress":  "192.168.55.200",
-	"brokerPort":     "1883",
-	"brokerQoS":      1,
-	"publishTopic":   "piWeather",
-	"sleepTime":      10
+	"notes":            "Raspberry Pi Zero 2 W with SHT40",
+	"brokerAddress":    "192.168.55.200",
+	"brokerPort":       "1883",
+	"brokerQoS":        1,
+	"publishTopic":     "piWeather",
+	"controlTopic":     "piControl",
+	"seaLevelPressure": 1015.1,
+	"publishInterval":  60
 }

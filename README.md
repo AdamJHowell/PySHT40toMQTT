@@ -28,3 +28,45 @@ This was designed for Raspberry Pi devices, and has been tested on a Pi Zero 2 W
 > Exec=/usr/bin/python /home/pi/Source/PySHT40toMQTT/PySHT40toMQTT.py /home/pi/Source/PySHT40toMQTT/config.json
 
 It is important to put the full path to all files which are not on the system path.
+
+
+
+To use systemd to control execution create this file:
+> sudo nano /lib/systemd/system/piWeather.service
+
+In that file, enter this text:
+
+> [Unit]
+> Description=Python Weather Service
+> After=multi-user.target
+>
+> [Service]
+> Type=idle
+> ExecStart=/usr/bin/python /home/pi/Source/PySHT40toMQTT/PySHT40toMQTT.py
+> WorkingDirectory=/home/pi/Source/PySHT40toMQTT
+> User=pi
+>
+> [Install]
+> WantedBy=multi-user.target
+
+Set the permissions on that file with:
+
+> sudo chmod 644 /lib/systemd/system/piWeather.service
+
+Systemd will need to be restarted with:
+
+> sudo systemctl daemon-reload
+
+Then the service can be enabled with:
+
+> sudo systemctl enable piWeather.service
+
+And it can be disabled with:
+
+> sudo systemctl disable piWeather.service
+
+The status of this service can be 
+
+> sudo systemctl status piWeather.service
+
+That's it!
