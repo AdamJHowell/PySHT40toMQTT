@@ -15,23 +15,8 @@ This was designed for Raspberry Pi devices, and has been tested on a Pi Zero 2 W
 > >
 > pip install paho-mqtt
 
-#### It can be set to auto-start by editing this file:
+#### It can be set to auto-start via systemd by creating/editing this file:
 
-> sudo nano /etc/xdg/autostart/display.desktop
-
-#### And setting the contents to this:
-
-> [Desktop Entry]
-> 
-> Name=PiCounter
-> 
-> Exec=/usr/bin/python /home/pi/Source/PySHT40toMQTT/PySHT40toMQTT.py /home/pi/Source/PySHT40toMQTT/config.json
-
-It is important to put the full path to all files which are not on the system path.
-
-
-
-To use systemd to control execution create this file:
 > sudo nano /lib/systemd/system/piWeather.service
 
 In that file, enter this text:
@@ -65,8 +50,14 @@ And it can be disabled with:
 
 > sudo systemctl disable piWeather.service
 
+The service can be started with:
+
+> sudo systemctl start piWeather.service
+
+The service can be stopped with:
+
+> sudo systemctl stop piWeather.service
+
 The status of this service can be 
 
 > sudo systemctl status piWeather.service
-
-That's it!
