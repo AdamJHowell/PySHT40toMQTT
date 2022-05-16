@@ -96,6 +96,8 @@ def get_ip():
     ip = sock.getsockname()[0]
   except InterruptedError:
     ip = '127.0.0.1'
+  except OSError:
+    ip = '127.0.0.1'
   finally:
     sock.close()
   return ip
