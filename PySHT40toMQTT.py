@@ -92,7 +92,7 @@ def get_ip():
   sock.settimeout( 0 )
   try:
     # This address doesn't need to be reachable.
-    sock.connect( ('10.255.255.255', 1) )
+    sock.connect( ('127.0.0.1', 1) )
     ip = sock.getsockname()[0]
   except InterruptedError:
     ip = '127.0.0.1'
