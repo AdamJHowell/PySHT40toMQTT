@@ -1,6 +1,6 @@
 {
 	"notes":            "Raspberry Pi Zero 2 W with SHT40",
-	"brokerAddress":    "192.168.55.200",
+	"brokerAddress":    "127.0.0.1",
 	"brokerPort":       "1883",
 	"brokerQoS":        1,
 	"publishTopic":     "piWeather",
