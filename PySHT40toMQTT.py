@@ -12,6 +12,7 @@ import socket
 import board
 import adafruit_sht4x
 import datetime
+import gpiozero as gz
 import paho.mqtt.client as mqtt
 from uuid import getnode as get_mac
 
@@ -22,6 +23,7 @@ results = json.loads( '{}' )
 configuration = json.loads( '{}' )
 config_file_name = "/home/pi/Source/PySHT40toMQTT/config.json"
 last_publish = 0
+cpu_temperature = 0
 
 
 def on_connect( con_client, userdata, flags, result ):
@@ -48,7 +50,7 @@ def on_message( sub_client, userdata, msg ):
     match command.casefold():
       case "publishTelemetry":
         temperature, relative_humidity = read_sht()
-        publish_results( temperature, relative_humidity )
+        publish_results( temperature, relative_humidity, cpu_temperature )
         last_publish = epoch_time()
       case "changeTelemetryInterval":
         old_value = configuration['publishInterval']
@@ -116,10 +118,11 @@ def get_timestamp():
   return datetime.datetime.now().strftime( "%Y-%m-%d %H:%M:%S" )
 
 
-def publish_results( temperature, relative_humidity ):
+def publish_results( temperature, relative_humidity, cpu_temp ):
   results['timeStamp'] = get_timestamp()
   results['tempC'] = temperature
   results['humidity'] = relative_humidity
+  results['cpuTemp'] = cpu_temp
   client.publish( topic = configuration['publishTopic'], payload = json.dumps( results, indent = '\t' ), qos = configuration['brokerQoS'] )
   print( json.dumps( results, indent = 3 ) )
 
@@ -136,6 +139,7 @@ def main( argv ):
   global configuration
   global config_file_name
   global last_publish
+  global cpu_temperature
 
   try:
     if len( argv ) > 1:
@@ -157,8 +161,7 @@ def main( argv ):
 
     print( "Found SHT4x with serial number " + hex( sht.serial_number ) )
     sht.mode = adafruit_sht4x.Mode.NOHEAT_HIGHPRECISION  # noqa
-    # Can also set the mode to enable heater
-    # sht.mode = adafruit_sht4x.Mode.LOWHEAT_100MS
+    # Can also set the mode to enable heater like this: sht.mode = adafruit_sht4x.Mode.LOWHEAT_100MS
     print( "Current mode is: ", adafruit_sht4x.Mode.string[sht.mode] )  # noqa
 
     # Create the Dictionary to hold results, and set the static components.
@@ -184,19 +187,21 @@ def main( argv ):
     if result_tuple[0] == 0:
       print( "Successfully subscribed to the control topic: \"" + configuration['controlTopic'] + "\"" )
 
+    client.loop_start()
     while True:
+      if not client.is_connected():
+        client.reconnect()
       current_time = epoch_time()
       interval = configuration['publishInterval']
       if current_time - interval > last_publish:
-        # ToDo: Determine if client.loop_start() and loop_stop() should be in this while loop.
-        client.loop_start()
         temperature, relative_humidity = read_sht()
-        publish_results( temperature, relative_humidity )
+        cpu_temperature = gz.CPUTemperature().temperature
+        publish_results( temperature, relative_humidity, cpu_temperature )
         last_publish = epoch_time()
-        client.loop_stop()
 
   except KeyboardInterrupt:
     print( "\nKeyboard interrupt detected, exiting...\n" )
+    client.loop_stop()
     client.unsubscribe( configuration['controlTopic'] )
     client.disconnect()
   except KeyError as key_error:
