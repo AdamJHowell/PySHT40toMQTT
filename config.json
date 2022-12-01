@@ -1,6 +1,6 @@
 {
 	"notes":            "Raspberry Pi Zero 2 W with SHT40",
-	"brokerAddress":    "TheOcho",
+	"brokerAddress":    "TheOcho.local",
 	"brokerPort":       "1883",
 	"brokerQoS":        1,
 	"publishTopic":     "piWeather",
