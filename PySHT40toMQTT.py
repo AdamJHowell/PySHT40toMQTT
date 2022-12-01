@@ -18,6 +18,7 @@ import datetime
 import json
 import socket
 import sys
+from threading import Lock
 import time
 from uuid import getnode as get_mac
 
@@ -36,69 +37,75 @@ last_publish = 0
 cpu_temperature = 0
 one_microsecond = 0.000001
 
+my_mutex = Lock()
 
-def on_connect( connect_client, userdata, flags, result ):
-  if result != 0:
-    print( "Bad connection, returned code: ", result )
-  if result == 2112:  # This should be unreachable, and should not cause problems if it is reached.
-    print( str( connect_client ) )
-    print( str( userdata ) )
-    print( str( flags ) )
+
+def on_connect( connect_client, userdata, flags, result_code ):
+  with my_mutex:
+    if result_code != 0:
+      print( "Bad connection, returned code: ", result_code )
+    print( f"Client {connect_client} connected from broker!" )
+    print( f"User data: {userdata}" )
+    print( f"Flags: {flags}" )
+    print( f"Result code: {result_code}" )
 
 
 def on_disconnect( disconnect_client, userdata, result_code ):
-  print( f"Client {disconnect_client} disconnected from broker!" )
-  print( f"User data: {userdata}" )
-  print( f"Result code: {result_code}" )
+  with my_mutex:
+    print( f"Client {disconnect_client} disconnected from broker!" )
+    print( f"User data: {userdata}" )
+    print( f"Result code: {result_code}" )
 
 
 def on_message( sub_client: mqtt.Client, userdata, message: mqtt.MQTTMessage ):
-  global configuration, last_publish, cpu_temperature
-  message = json.loads( str( message.payload.decode( 'utf-8' ) ) )
-  print( json.dumps( message, indent = '\t' ) )
-  if 'command' in message:
-    command = message['command']
-    print( "Processing command \"" + command + "\"" )
-    match command.casefold():
-      case "publishTelemetry":
-        temperature, relative_humidity = read_sht()
-        cpu_temperature = gz.CPUTemperature().temperature
-        publish_results( round( temperature, 3 ), round( relative_humidity, 3 ), cpu_temperature )
-        last_publish = epoch_time()
-      case "changeTelemetryInterval":
-        old_value = configuration['publishInterval']
-        new_value = message['value']
-        if old_value != new_value and new_value > 4:
-          print( "Old publish interval: " + old_value )
-          configuration['publishInterval'] = new_value
-          print( "New publish interval: " + configuration['publishInterval'] )
-        else:
-          print( "Not changing the telemetry publish interval." )
-      case "changeSeaLevelPressure":
-        old_value = configuration['seaLevelPressure']
-        new_value = message['value']
-        if old_value != new_value and 100 < new_value < 10000:
-          print( "Old sea level pressure: " + old_value )
-          configuration['seaLevelPressure'] = new_value
-          print( "New sea level pressure: " + configuration['seaLevelPressure'] )
-        else:
-          print( "Not changing the sea level pressure." )
-      case "publishStatus":
-        publish_status()
-      case "debug":
-        print( str( sub_client ) )
-        print( str( userdata ) )
-      case _:
-        print( "The command \"" + str( command ) + "\" is not recognized." )
-        print( "Currently recognized commands are:\n\tpublishTelemetry\n\tchangeTelemetryInterval\n\tchangeSeaLevelPressure\n\tpublishStatus" )
-  else:
-    print( "Message did not contain a command property." )
+  with my_mutex:
+    global configuration, last_publish, cpu_temperature
+    message = json.loads( str( message.payload.decode( 'utf-8' ) ) )
+    print( json.dumps( message, indent = '\t' ) )
+    if 'command' in message:
+      command = message['command']
+      print( "Processing command \"" + command + "\"" )
+      match command.casefold():
+        case "publishTelemetry":
+          temperature, relative_humidity = read_sht()
+          cpu_temperature = gz.CPUTemperature().temperature
+          publish_telemetry( round( temperature, 3 ), round( relative_humidity, 3 ), cpu_temperature )
+          last_publish = epoch_time()
+        case "changeTelemetryInterval":
+          old_value = configuration['publishInterval']
+          new_value = message['value']
+          if old_value != new_value and new_value > 4:
+            print( "Old publish interval: " + old_value )
+            configuration['publishInterval'] = new_value
+            print( "New publish interval: " + configuration['publishInterval'] )
+          else:
+            print( "Not changing the telemetry publish interval." )
+        case "changeSeaLevelPressure":
+          old_value = configuration['seaLevelPressure']
+          new_value = message['value']
+          if old_value != new_value and 100 < new_value < 10000:
+            print( "Old sea level pressure: " + old_value )
+            configuration['seaLevelPressure'] = new_value
+            print( "New sea level pressure: " + configuration['seaLevelPressure'] )
+          else:
+            print( "Not changing the sea level pressure." )
+        case "publishStatus":
+          publish_status()
+        case "debug":
+          print( str( sub_client ) )
+          print( str( userdata ) )
+        case _:
+          print( "The command \"" + str( command ) + "\" is not recognized." )
+          print( "Currently recognized commands are:\n\tpublishTelemetry\n\tchangeTelemetryInterval\n\tchangeSeaLevelPressure\n\tpublishStatus" )
+    else:
+      print( "Message did not contain a command property." )
 
 
-def on_publish( pub_client, userdata, result ):
-  print( str( pub_client ) )
-  print( str( userdata ) )
-  print( str( result ) )
+def on_publish( pub_client, userdata, result_code ):
+  with my_mutex:
+    print( f"Client {pub_client} published." )
+    print( f"User data: {userdata}" )
+    print( f"Result code: {result_code}" )
 
 
 def get_ip():
@@ -132,7 +139,7 @@ def get_timestamp():
   return datetime.datetime.now().strftime( "%Y-%m-%d %H:%M:%S" )
 
 
-def publish_results( temperature, relative_humidity, cpu_temp ):
+def publish_telemetry( temperature, relative_humidity, cpu_temp ):
   results['timeStamp'] = get_timestamp()
   results['tempC'] = temperature
   results['humidity'] = relative_humidity
@@ -215,7 +222,7 @@ def main( argv ):
       if current_time - interval > last_publish:
         temperature, relative_humidity = read_sht()
         cpu_temperature = gz.CPUTemperature().temperature
-        publish_results( round( temperature, 3 ), round(relative_humidity, 3), cpu_temperature )
+        publish_telemetry( round( temperature, 3 ), round( relative_humidity, 3 ), cpu_temperature )
         last_publish = epoch_time()
       time.sleep( one_microsecond )  # Release CPU.
 
