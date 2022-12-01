@@ -9,7 +9,7 @@ This requires Python version 3.10 or higher.
 General MQTT flow:
   * Use connect()/connect_async() to connect to a broker.
   * Use loop_forever() to handle calling loop() for you in a blocking function.
-  * Use subscribe() to subscribe to a topic and receive messages.
+  * Use loop_start() to set a thread running to call loop() for you.
   * Use publish() to send messages.
   * Use disconnect() to disconnect from the broker.
 """
