@@ -72,14 +72,12 @@ def on_message( sub_client: mqtt.Client, userdata, message: mqtt.MQTTMessage ):
             print( "New sea level pressure: " + configuration['seaLevelPressure'] )
           else:
             print( "Not changing the sea level pressure." )
-        case "publishStatus":
-          publish_status()
         case "debug":
           print( str( sub_client ) )
           print( str( userdata ) )
         case _:
           print( "The command \"" + str( command ) + "\" is not recognized." )
-          print( "Currently recognized commands are:\n\tpublishTelemetry\n\tchangeTelemetryInterval\n\tchangeSeaLevelPressure\n\tpublishStatus" )
+          print( "Currently recognized commands are:\n\tpublishTelemetry\n\tchangeTelemetryInterval\n\tchangeSeaLevelPressure" )
     else:
       print( "Message did not contain a command property." )
 
@@ -110,20 +108,12 @@ def publish_telemetry( temperature, relative_humidity, cpu_temp ):
   results['tempC'] = temperature
   results['humidity'] = relative_humidity
   results['cpuTemp'] = cpu_temp
-  client.publish( topic = configuration['publishTopic'], payload = json.dumps( results, indent = '\t' ), qos = configuration['brokerQoS'] )
-  client.publish( topic = "office/piz2-2/sht40/tempC", payload = temperature, qos = configuration['brokerQoS'] )
   temp_f = (temperature * 9 / 5) + 32
-  client.publish( topic = "office/piz2-2/sht40/tempF", payload = temp_f, qos = configuration['brokerQoS'] )
+  client.publish( topic = configuration['publishTopic'], payload = json.dumps( results, indent = '\t' ), qos = configuration['brokerQoS'] )
   client.publish( topic = "office/piz2-2/cpuTemp", payload = cpu_temp, qos = configuration['brokerQoS'] )
-  client.publish( topic = "office/piz2-2/humidity", payload = relative_humidity, qos = configuration['brokerQoS'] )
-  print( json.dumps( results, indent = 3 ) )
-
-
-def publish_status():
-  status = results
-  status['timeStamp'] = get_timestamp()
-  status.pop( 'temperature', None )
-  client.publish( topic = configuration['publishTopic'], payload = json.dumps( status, indent = '\t' ), qos = configuration['brokerQoS'] )
+  client.publish( topic = "office/piz2-2/sht40/tempC", payload = temperature, qos = configuration['brokerQoS'] )
+  client.publish( topic = "office/piz2-2/sht40/tempF", payload = temp_f, qos = configuration['brokerQoS'] )
+  client.publish( topic = "office/piz2-2/sht40/humidity", payload = relative_humidity, qos = configuration['brokerQoS'] )
   print( json.dumps( results, indent = 3 ) )
 
 
