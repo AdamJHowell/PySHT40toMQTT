@@ -40,23 +40,6 @@ one_microsecond = 0.000001
 my_mutex = Lock()
 
 
-def on_connect( connect_client, userdata, flags, result_code ):
-  with my_mutex:
-    if result_code != 0:
-      print( "Bad connection, returned code: ", result_code )
-    print( f"Client {connect_client} connected from broker!" )
-    print( f"User data: {userdata}" )
-    print( f"Flags: {flags}" )
-    print( f"Result code: {result_code}" )
-
-
-def on_disconnect( disconnect_client, userdata, result_code ):
-  with my_mutex:
-    print( f"Client {disconnect_client} disconnected from broker!" )
-    print( f"User data: {userdata}" )
-    print( f"Result code: {result_code}" )
-
-
 def on_message( sub_client: mqtt.Client, userdata, message: mqtt.MQTTMessage ):
   with my_mutex:
     global configuration, last_publish, cpu_temperature
@@ -67,10 +50,10 @@ def on_message( sub_client: mqtt.Client, userdata, message: mqtt.MQTTMessage ):
       print( "Processing command \"" + command + "\"" )
       match command.casefold():
         case "publishTelemetry":
-          temperature, relative_humidity = read_sht()
+          temperature, relative_humidity = sht.measurements
           cpu_temperature = gz.CPUTemperature().temperature
           publish_telemetry( round( temperature, 3 ), round( relative_humidity, 3 ), cpu_temperature )
-          last_publish = epoch_time()
+          last_publish = round( time.time() )
         case "changeTelemetryInterval":
           old_value = configuration['publishInterval']
           new_value = message['value']
@@ -101,13 +84,6 @@ def on_message( sub_client: mqtt.Client, userdata, message: mqtt.MQTTMessage ):
       print( "Message did not contain a command property." )
 
 
-def on_publish( pub_client, userdata, result_code ):
-  with my_mutex:
-    print( f"Client {pub_client} published." )
-    print( f"User data: {userdata}" )
-    print( f"Result code: {result_code}" )
-
-
 def get_ip():
   sock = socket.socket( socket.AF_INET, socket.SOCK_DGRAM )
   sock.settimeout( 0 )
@@ -122,16 +98,6 @@ def get_ip():
   finally:
     sock.close()
   return ip
-
-
-def read_sht():
-  global sht
-  return sht.measurements
-
-
-def epoch_time():
-  # Returns the time in seconds since Unix Epoch, rounded to an integer.
-  return round( time.time() )
 
 
 def get_timestamp():
@@ -201,10 +167,7 @@ def main( argv ):
     results['clientMAC'] = ':'.join( ("%012X" % get_mac())[i:i + 2] for i in range( 0, 12, 2 ) )
 
     # Define callback functions.
-    client.on_connect = on_connect
-    client.on_publish = on_publish
     client.on_message = on_message
-    client.on_disconnect = on_disconnect  # This is throwing: "TypeError: on_disconnect() takes 0 positional arguments but 3 were given" when the program closes.
 
     # Connect using the details from the configuration file.
     client.connect( configuration['brokerAddress'], int( configuration['brokerPort'] ) )
@@ -217,13 +180,13 @@ def main( argv ):
     while True:
       if not client.is_connected():
         client.reconnect()
-      current_time = epoch_time()
+      current_time = round( time.time() )
       interval = configuration['publishInterval']
       if current_time - interval > last_publish:
-        temperature, relative_humidity = read_sht()
+        temperature, relative_humidity = sht.measurements
         cpu_temperature = gz.CPUTemperature().temperature
         publish_telemetry( round( temperature, 3 ), round( relative_humidity, 3 ), cpu_temperature )
-        last_publish = epoch_time()
+        last_publish = round( time.time() )
       time.sleep( one_microsecond )  # Release CPU.
 
   except KeyboardInterrupt:
