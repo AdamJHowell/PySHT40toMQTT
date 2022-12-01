@@ -1,20 +1,30 @@
-# This tool will connect to a MQTT broker, and publish simple MQTT messages containing weather data.
-# The sole command-line-parameter is the configuration file.
-# The configuration file is in JSON format.
-# It must contain "brokerAddress", "brokerPort", "brokerQoS", "publishTopic", and "publishInterval".
-# https://pypi.org/project/paho-mqtt/
-# This requires Python version 3.10 or higher.
+"""
+This tool will connect to a MQTT broker, and publish simple MQTT messages containing weather data.
+The sole command-line-parameter is the configuration file.
+The configuration file is in JSON format.
+It must contain "brokerAddress", "brokerPort", "brokerQoS", "publishTopic", and "publishInterval".
+https://pypi.org/project/paho-mqtt/
+This requires Python version 3.10 or higher.
 
-import sys
-import json
-import time
-import socket
-import board
-import adafruit_sht4x
+General MQTT flow:
+  * Use connect()/connect_async() to connect to a broker.
+  * Use loop_forever() to handle calling loop() for you in a blocking function.
+  * Use subscribe() to subscribe to a topic and receive messages.
+  * Use publish() to send messages.
+  * Use disconnect() to disconnect from the broker.
+"""
+
 import datetime
+import json
+import socket
+import sys
+import time
+from uuid import getnode as get_mac
+
+import adafruit_sht4x
+import board
 import gpiozero as gz
 import paho.mqtt.client as mqtt
-from uuid import getnode as get_mac
 
 client = mqtt.Client( client_id = "PySHT40toMQTT" )
 i2c = board.I2C()  # Uses board.SCL and board.SDA
@@ -24,25 +34,27 @@ configuration = json.loads( '{}' )
 config_file_name = "/home/pi/Source/PySHT40toMQTT/config.json"
 last_publish = 0
 cpu_temperature = 0
+one_microsecond = 0.000001
 
 
-def on_connect( con_client, userdata, flags, result ):
+def on_connect( connect_client, userdata, flags, result ):
   if result != 0:
     print( "Bad connection, returned code: ", result )
   if result == 2112:  # This should be unreachable, and should not cause problems if it is reached.
-    print( str( con_client ) )
+    print( str( connect_client ) )
     print( str( userdata ) )
     print( str( flags ) )
 
 
-def on_disconnect():
-  print( "Disconnected from broker!" )
+def on_disconnect( disconnect_client, userdata, result_code ):
+  print( f"Client {disconnect_client} disconnected from broker!" )
+  print( f"User data: {userdata}" )
+  print( f"Result code: {result_code}" )
 
 
-def on_message( sub_client, userdata, msg ):
-  global configuration
-  global last_publish
-  message = json.loads( str( msg.payload.decode( 'utf-8' ) ) )
+def on_message( sub_client: mqtt.Client, userdata, message: mqtt.MQTTMessage ):
+  global configuration, last_publish
+  message = json.loads( str( message.payload.decode( 'utf-8' ) ) )
   print( json.dumps( message, indent = '\t' ) )
   if 'command' in message:
     command = message['command']
@@ -83,10 +95,9 @@ def on_message( sub_client, userdata, msg ):
 
 
 def on_publish( pub_client, userdata, result ):
-  if result == 2112.2112:  # This should be unreachable, and should not cause problems if it is reached.
-    print( str( pub_client ) )
-    print( str( userdata ) )
-    print( str( result ) )
+  print( str( pub_client ) )
+  print( str( userdata ) )
+  print( str( result ) )
 
 
 def get_ip():
@@ -180,7 +191,7 @@ def main( argv ):
     client.on_connect = on_connect
     client.on_publish = on_publish
     client.on_message = on_message
-    # client.on_disconnect = on_disconnect  # This is throwing: "TypeError: on_disconnect() takes 0 positional arguments but 3 were given" when the program closes.
+    client.on_disconnect = on_disconnect  # This is throwing: "TypeError: on_disconnect() takes 0 positional arguments but 3 were given" when the program closes.
 
     # Connect using the details from the configuration file.
     client.connect( configuration['brokerAddress'], int( configuration['brokerPort'] ) )
@@ -200,11 +211,12 @@ def main( argv ):
         cpu_temperature = gz.CPUTemperature().temperature
         publish_results( temperature, relative_humidity, cpu_temperature )
         last_publish = epoch_time()
+      time.sleep( one_microsecond )  # Release CPU.
 
   except KeyboardInterrupt:
     print( "\nKeyboard interrupt detected, exiting...\n" )
-    client.loop_stop()
     client.unsubscribe( configuration['controlTopic'] )
+    client.loop_stop()
     client.disconnect()
   except KeyError as key_error:
     log_string = "Python dictionary key error: %s" % str( key_error )
