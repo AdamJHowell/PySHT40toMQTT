@@ -53,7 +53,7 @@ def on_disconnect( disconnect_client, userdata, result_code ):
 
 
 def on_message( sub_client: mqtt.Client, userdata, message: mqtt.MQTTMessage ):
-  global configuration, last_publish
+  global configuration, last_publish, cpu_temperature
   message = json.loads( str( message.payload.decode( 'utf-8' ) ) )
   print( json.dumps( message, indent = '\t' ) )
   if 'command' in message:
@@ -62,7 +62,8 @@ def on_message( sub_client: mqtt.Client, userdata, message: mqtt.MQTTMessage ):
     match command.casefold():
       case "publishTelemetry":
         temperature, relative_humidity = read_sht()
-        publish_results( temperature, relative_humidity, cpu_temperature )
+        cpu_temperature = gz.CPUTemperature().temperature
+        publish_results( round( temperature, 3 ), round( relative_humidity, 3 ), cpu_temperature )
         last_publish = epoch_time()
       case "changeTelemetryInterval":
         old_value = configuration['publishInterval']
@@ -138,7 +139,7 @@ def publish_results( temperature, relative_humidity, cpu_temp ):
   results['cpuTemp'] = cpu_temp
   client.publish( topic = configuration['publishTopic'], payload = json.dumps( results, indent = '\t' ), qos = configuration['brokerQoS'] )
   client.publish( topic = "office/piz2-2/sht40/tempC", payload = temperature, qos = configuration['brokerQoS'] )
-  temp_f = ( temperature * 9 / 5 ) + 32
+  temp_f = (temperature * 9 / 5) + 32
   client.publish( topic = "office/piz2-2/sht40/tempF", payload = temp_f, qos = configuration['brokerQoS'] )
   client.publish( topic = "office/piz2-2/cpuTemp", payload = cpu_temp, qos = configuration['brokerQoS'] )
   client.publish( topic = "office/piz2-2/humidity", payload = relative_humidity, qos = configuration['brokerQoS'] )
@@ -214,7 +215,7 @@ def main( argv ):
       if current_time - interval > last_publish:
         temperature, relative_humidity = read_sht()
         cpu_temperature = gz.CPUTemperature().temperature
-        publish_results( temperature, relative_humidity, cpu_temperature )
+        publish_results( round( temperature, 3 ), round(relative_humidity, 3), cpu_temperature )
         last_publish = epoch_time()
       time.sleep( one_microsecond )  # Release CPU.
 
