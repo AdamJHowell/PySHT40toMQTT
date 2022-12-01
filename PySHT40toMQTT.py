@@ -163,7 +163,7 @@ def main( argv ):
     client.connect( configuration['brokerAddress'], int( configuration['brokerPort'] ) )
     # Subscribe to the control topic.
     result_tuple = client.subscribe( configuration['controlTopic'], configuration['brokerQoS'] )
-    if result_tuple[0] == 0:
+    if result_tuple[0] == mqtt.MQTT_ERR_SUCCESS:
       print( "Successfully subscribed to the control topic: \"" + configuration['controlTopic'] + "\"" )
 
     client.loop_start()
@@ -180,10 +180,17 @@ def main( argv ):
       time.sleep( one_microsecond )  # Release CPU.
 
   except KeyboardInterrupt:
-    print( "\nKeyboard interrupt detected, exiting...\n" )
-    client.unsubscribe( configuration['controlTopic'] )
+    print( "\nKeyboard interrupt detected, unsubscribing and disconnecting from the broker...\n" )
+    unsub_tuple = client.unsubscribe( configuration['controlTopic'] )
+    if unsub_tuple[0] != mqtt.MQTT_ERR_SUCCESS:
+      print( f"Failed to unsubscribe properly!  Error: {unsub_tuple[0]}" )
+    else:
+      print( f"Successfully unsubscribed from {configuration['controlTopic']}" )
     client.loop_stop()
-    client.disconnect()
+    if client.disconnect() != mqtt.MQTT_ERR_SUCCESS:
+      print( f"Failed to disconnect successfully!" )
+    else:
+      print( f"Successfully disconnected from {configuration['brokerAddress']}:{configuration['brokerPort']}" )
   except KeyError as key_error:
     log_string = "Python dictionary key error: %s" % str( key_error )
     print( log_string )
