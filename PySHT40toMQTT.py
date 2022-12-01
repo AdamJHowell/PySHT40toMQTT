@@ -137,6 +137,11 @@ def publish_results( temperature, relative_humidity, cpu_temp ):
   results['humidity'] = relative_humidity
   results['cpuTemp'] = cpu_temp
   client.publish( topic = configuration['publishTopic'], payload = json.dumps( results, indent = '\t' ), qos = configuration['brokerQoS'] )
+  client.publish( topic = "office/piz2-2/sht40/tempC", payload = temperature, qos = configuration['brokerQoS'] )
+  temp_f = ( temperature * 9 / 5 ) + 32
+  client.publish( topic = "office/piz2-2/sht40/tempF", payload = temp_f, qos = configuration['brokerQoS'] )
+  client.publish( topic = "office/piz2-2/cpuTemp", payload = cpu_temp, qos = configuration['brokerQoS'] )
+  client.publish( topic = "office/piz2-2/humidity", payload = relative_humidity, qos = configuration['brokerQoS'] )
   print( json.dumps( results, indent = 3 ) )
 
 
