@@ -83,18 +83,10 @@ def on_message( sub_client: mqtt.Client, userdata, message: mqtt.MQTTMessage ):
 
 
 def get_ip():
-  sock = socket.socket( socket.AF_INET, socket.SOCK_DGRAM )
-  sock.settimeout( 0 )
-  try:
-    # This address doesn't need to be reachable.
-    sock.connect( ('127.0.0.1', 1) )
-    ip = sock.getsockname()[0]
-  except InterruptedError:
-    ip = '127.0.0.1'
-  except OSError:
-    ip = '127.0.0.1'
-  finally:
-    sock.close()
+  hostname = socket.gethostname()
+  ip = socket.gethostbyname( hostname + ".local" )
+  print( f"Hostname: {hostname}" )
+  print( f"IP address: {ip}" )
   return ip
 
 
@@ -110,6 +102,9 @@ def publish_telemetry( temperature, relative_humidity, cpu_temp ):
   results['cpuTemp'] = cpu_temp
   temp_f = (temperature * 9 / 5) + 32
   client.publish( topic = configuration['publishTopic'], payload = json.dumps( results, indent = '\t' ), qos = configuration['brokerQoS'] )
+  client.publish( topic = "office/piz2-2/mac", payload = results['clientMAC'], qos = configuration['brokerQoS'] )
+  client.publish( topic = "office/piz2-2/ip", payload = results['clientAddress'], qos = configuration['brokerQoS'] )
+  client.publish( topic = "office/piz2-2/hostname", payload = results['host'], qos = configuration['brokerQoS'] )
   client.publish( topic = "office/piz2-2/cpuTemp", payload = cpu_temp, qos = configuration['brokerQoS'] )
   client.publish( topic = "office/piz2-2/sht40/tempC", payload = temperature, qos = configuration['brokerQoS'] )
   client.publish( topic = "office/piz2-2/sht40/tempF", payload = temp_f, qos = configuration['brokerQoS'] )
@@ -173,14 +168,14 @@ def main( argv ):
       current_time = round( time.time() )
       interval = configuration['publishInterval']
       if current_time - interval > last_publish:
-        temperature, relative_humidity = sht.measurements
+        temperature, humidity = sht.measurements
         cpu_temperature = gz.CPUTemperature().temperature
-        publish_telemetry( round( temperature, 3 ), round( relative_humidity, 3 ), cpu_temperature )
+        publish_telemetry( round( temperature, 3 ), round( humidity, 3 ), cpu_temperature )
         last_publish = round( time.time() )
       time.sleep( one_microsecond )  # Release CPU.
 
   except KeyboardInterrupt:
-    print( "\nKeyboard interrupt detected, unsubscribing and disconnecting from the broker...\n" )
+    print( "\nKeyboard interrupt detected, cleaning up...\n" )
     unsub_tuple = client.unsubscribe( configuration['controlTopic'] )
     if unsub_tuple[0] != mqtt.MQTT_ERR_SUCCESS:
       print( f"Failed to unsubscribe properly!  Error: {unsub_tuple[0]}" )
