@@ -77,7 +77,8 @@ def on_message( sub_client: mqtt.Client, userdata, message: mqtt.MQTTMessage ):
           print( str( userdata ) )
         case _:
           print( "The command \"" + str( command ) + "\" is not recognized." )
-          print( "Currently recognized commands are:\n\tpublishTelemetry\n\tchangeTelemetryInterval\n\tchangeSeaLevelPressure" )
+          print(
+            "Currently recognized commands are:\n\tpublishTelemetry\n\tchangeTelemetryInterval\n\tchangeSeaLevelPressure" )
     else:
       print( "Message did not contain a command property." )
 
@@ -101,14 +102,16 @@ def publish_telemetry( temperature, relative_humidity, cpu_temp ):
   results['humidity'] = relative_humidity
   results['cpuTemp'] = cpu_temp
   temp_f = (temperature * 9 / 5) + 32
-  client.publish( topic = configuration['publishTopic'], payload = json.dumps( results, indent = '\t' ), qos = configuration['brokerQoS'] )
+  client.publish( topic = configuration['publishTopic'], payload = json.dumps( results, indent = '\t' ),
+                  qos = configuration['brokerQoS'] )
   client.publish( topic = "office/piz2-2/mac", payload = results['clientMAC'], qos = configuration['brokerQoS'] )
   client.publish( topic = "office/piz2-2/ip", payload = results['clientAddress'], qos = configuration['brokerQoS'] )
   client.publish( topic = "office/piz2-2/hostname", payload = results['host'], qos = configuration['brokerQoS'] )
   client.publish( topic = "office/piz2-2/cpuTemp", payload = cpu_temp, qos = configuration['brokerQoS'] )
   client.publish( topic = "office/piz2-2/sht40/tempC", payload = temperature, qos = configuration['brokerQoS'] )
   client.publish( topic = "office/piz2-2/sht40/tempF", payload = temp_f, qos = configuration['brokerQoS'] )
-  client.publish( topic = "office/piz2-2/sht40/humidity", payload = relative_humidity, qos = configuration['brokerQoS'] )
+  client.publish( topic = "office/piz2-2/sht40/humidity", payload = relative_humidity,
+                  qos = configuration['brokerQoS'] )
   print( json.dumps( results, indent = 3 ) )
 
 
@@ -141,15 +144,7 @@ def main( argv ):
     # Can also set the mode to enable heater like this: sht.mode = adafruit_sht4x.Mode.LOWHEAT_100MS
     print( "Current mode is: ", adafruit_sht4x.Mode.string[sht.mode] )  # noqa
 
-    # Create the Dictionary to hold results, and set the static components.
-    results['host'] = host_name
-    results['timeStamp'] = get_timestamp()
-    if 'notes' in configuration:
-      results['notes'] = configuration['notes']
-    results['brokerAddress'] = configuration['brokerAddress']
-    results['brokerPort'] = configuration['brokerPort']
-    results['clientAddress'] = get_ip()
-    results['clientMAC'] = ':'.join( ("%012X" % get_mac())[i:i + 2] for i in range( 0, 12, 2 ) )
+    initialize_results( configuration, host_name )
 
     # Define callback functions.
     client.on_message = on_message
@@ -163,16 +158,7 @@ def main( argv ):
 
     client.loop_start()
     while True:
-      if not client.is_connected():
-        client.reconnect()
-      current_time = round( time.time() )
-      interval = configuration['publishInterval']
-      if current_time - interval > last_publish:
-        temperature, humidity = sht.measurements
-        cpu_temperature = gz.CPUTemperature().temperature
-        publish_telemetry( round( temperature, 3 ), round( humidity, 3 ), cpu_temperature )
-        last_publish = round( time.time() )
-      time.sleep( one_microsecond )  # Release CPU.
+      process_telemetry( configuration['publishInterval'] )
 
   except KeyboardInterrupt:
     print( "\nKeyboard interrupt detected, cleaning up...\n" )
@@ -191,6 +177,34 @@ def main( argv ):
     print( log_string )
   except ConnectionRefusedError as connection_error:
     print( "Connection error: " + str( connection_error ) )
+
+
+def initialize_results( config, host_name ):
+  # Create the Dictionary to hold results, and set the static components.
+  results['host'] = host_name
+  results['timeStamp'] = get_timestamp()
+  if 'notes' in config:
+    results['notes'] = config['notes']
+  results['brokerAddress'] = config['brokerAddress']
+  results['brokerPort'] = config['brokerPort']
+  results['clientAddress'] = get_ip()
+  results['clientMAC'] = ':'.join( ("%012X" % get_mac())[i:i + 2] for i in range( 0, 12, 2 ) )
+
+
+def process_telemetry( interval ):
+  global cpu_temperature, last_publish
+  if not client.is_connected():
+    try:
+      client.reconnect()
+    except TimeoutError:
+      time.sleep( 120 )
+  current_time = round( time.time() )
+  if current_time - interval > last_publish:
+    temperature, humidity = sht.measurements
+    cpu_temperature = gz.CPUTemperature().temperature
+    publish_telemetry( round( temperature, 3 ), round( humidity, 3 ), cpu_temperature )
+    last_publish = round( time.time() )
+  time.sleep( one_microsecond )  # Release CPU.
 
 
 if __name__ == "__main__":
