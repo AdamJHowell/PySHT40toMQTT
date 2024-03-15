@@ -169,7 +169,7 @@ def main( argv ):
       print( f"Successfully unsubscribed from {configuration['controlTopic']}" )
     client.loop_stop()
     if client.disconnect() != mqtt.MQTT_ERR_SUCCESS:
-      print( f"Failed to disconnect successfully!" )
+      print( "Failed to disconnect successfully!" )
     else:
       print( f"Successfully disconnected from {configuration['brokerAddress']}:{configuration['brokerPort']}" )
   except KeyError as key_error:
